@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "commonjs",
+    "target": "es2019",
+    "declaration": true,
+    "outDir": "./dist",
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "maxNodeModuleJsDepth": 0,
+    "esModuleInterop": true,
+
+    "paths":{
+      "src/*":[
+        "./src/*"
+      ]
+    },
+
+    "plugins":[
+      {
+         "transform":"typescript-transform-paths"
+      },
+      {
+         "transform":"typescript-transform-paths",
+         "afterDeclarations": true
+      }
+   ],
+   "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "src",
+    "types/**/*.d.ts"
+  ]
+}

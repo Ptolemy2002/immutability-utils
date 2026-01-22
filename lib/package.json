@@ -1,0 +1,42 @@
+{
+    "name": "@ptolemy2002/immutability-utils",
+    "version": "1.0.0",
+    "private": true,
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "/dist"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Ptolemy2002/immutability-utils",
+        "directory": "lib"
+    },
+    "scripts": {
+        "prepare": "npx ts-patch install -s",
+        "build": "bash ./scripts/build.sh",
+        "_build": "tsc --project ./tsconfig.json",
+        "typecheck": "tsc --noEmit",
+        "postinstall": "npx typesync",
+        "uninstall": "bash ./scripts/uninstall.sh",
+        "reinstall": "bash ./scripts/reinstall.sh",
+        "example-uninstall": "bash ./scripts/example-uninstall.sh",
+        "example-install": "bash ./scripts/example-install.sh",
+        "example-reinstall": "bash ./scripts/example-reinstall.sh",
+        "example-start": "bash ./scripts/example-start.sh",
+        "release": "bash ./scripts/release.sh",
+        "release-patch": "bash ./scripts/release.sh patch",
+        "release-minor": "bash ./scripts/release.sh minor",
+        "release-major": "bash ./scripts/release.sh major"
+    },
+    "devDependencies": {
+        "ts-patch": "^3.3.0",
+        "tsconfig-paths": "^4.2.0",
+        "typescript-transform-paths": "^3.5.3"
+    },
+    "dependencies": {
+        "@ptolemy2002/ts-utils": "^3.2.1",
+        "@types/is-callable": "^1.1.2",
+        "is-callable": "^1.2.7"
+    }
+}
