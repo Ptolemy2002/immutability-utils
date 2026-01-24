@@ -9,6 +9,7 @@ A TypeScript library that wraps mutable classes and makes them immutable using p
 - **Type-Safe**: Full TypeScript support with proper type inference
 - **Efficient**: Groups multiple mutations within a single method call into one clone operation
 - **Toggle Support**: Can temporarily disable immutability when needed
+- **Clone Listeners**: Register callbacks that execute whenever a clone operation occurs
 
 ## Installation
 
@@ -81,6 +82,29 @@ dataRef.current.someProperty = "mutated in place"; // No clone created
 dataRef.enabled = true;
 ```
 
+#### Clone Listeners
+
+You can register listeners that will be called whenever a clone operation occurs. This is useful for tracking changes, updating UI, or triggering side effects.
+
+```typescript
+const counterRef = immutable(new Counter(0));
+
+// Add a listener that logs whenever a clone occurs
+counterRef.cloneListeners.push((imRef) => {
+    console.log('Clone occurred! New value:', imRef.current.value);
+});
+
+// This will trigger the listener
+counterRef.current.increment(5); // Logs: "Clone occurred! New value: 5"
+counterRef.current.increment(3); // Logs: "Clone occurred! New value: 8"
+```
+
+**Use Cases for Clone Listeners:**
+- Triggering React state updates when working with immutable data structures
+- Logging or debugging mutation operations
+- Synchronizing changes to external systems
+- Implementing undo/redo functionality
+
 ## API Reference
 
 ### Types
@@ -99,8 +123,9 @@ A reference object containing the current immutable instance and an enabled flag
 
 ```typescript
 type ImmutableRef<T=object> = {
-    current: Cloneable<T>,  // The current instance
-    enabled: boolean         // Whether immutability is enabled
+    current: Cloneable<T>,                          // The current instance
+    enabled: boolean,                                // Whether immutability is enabled
+    cloneListeners: Array<(imRef: ImmutableRef<T>) => void>  // Callbacks invoked on clone
 };
 ```
 
@@ -117,6 +142,7 @@ Creates an immutable reference wrapper around the provided object.
 - An `ImmutableRef<T>` object containing:
   - `current`: The proxied instance (initially the object you passed in)
   - `enabled`: A boolean flag (initially `true`) that controls whether immutability is active
+  - `cloneListeners`: An empty array (initially `[]`) where you can register listener callbacks
 
 **Example:**
 ```typescript
@@ -133,6 +159,7 @@ console.log(ref.enabled); // true
    - Sets the property on the clone
    - Re-enables immutability
    - Updates `current` to point to the new clone
+   - Invokes all registered clone listeners
 
 2. **Method Calls**: When you call a method (except `clone()`), the library:
    - Clones the object
@@ -140,6 +167,7 @@ console.log(ref.enabled); // true
    - Calls the method on the clone
    - Re-enables immutability
    - Updates `current` to point to the new clone
+   - Invokes all registered clone listeners
    - Returns the method's result
 
 3. **Read Operations**: Property reads and getters do not trigger cloning and return the value directly.

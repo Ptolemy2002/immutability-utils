@@ -2,10 +2,13 @@ import isCallable from 'is-callable';
 import { Override } from '@ptolemy2002/ts-utils';
 
 export type Cloneable<T=object> = Override<T, { clone(): Cloneable<T> }>;
-export type ImmutableRef<T=object> = { current: Cloneable<T>, enabled: boolean };
+export type ImmutableRef<T=object> = {
+    current: Cloneable<T>, enabled: boolean,
+    cloneListeners: Array<(imRef: ImmutableRef<T>) => void>
+};
 
 export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
-    const imRef: ImmutableRef<T> = { current: obj, enabled: true };
+    const imRef: ImmutableRef<T> = { current: obj, enabled: true, cloneListeners: [] };
 
     // Wrap in a Proxy to override mutations
     function applyProxy(target: Cloneable<T>): Cloneable<T> {
@@ -31,6 +34,10 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
                         // and reapply the proxy
                         imRef.current = applyProxy(cloned);
 
+                        for (const listener of imRef.cloneListeners) {
+                            listener(imRef);
+                        }
+
                         return result;
                     };
                 }
@@ -54,6 +61,10 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
                 // Sync the reference to the new cloned object
                 // and reapply the proxy
                 imRef.current = applyProxy(cloned);
+
+                for (const listener of imRef.cloneListeners) {
+                    listener(imRef);
+                }
 
                 return result;
             }

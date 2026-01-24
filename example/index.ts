@@ -74,14 +74,17 @@ function executeTest(
     console.log(`\n--- ${name} ---`);
 
     let cloneCalls = 0;
+    let cloneListenerCalls = 0;
     cloneCallCallback = () => { cloneCalls++; };
     const dataRef = immutable<Data>(new Data(initialValue));
+    dataRef.cloneListeners.push(() => { cloneListenerCalls++; });
 
     // We need multiple passes so that we can ensure each clone has the proxy applied
     // correctly.
     let passesSucceeded = 0;
     for (let i = 0; i < passes; i++) {
         cloneCalls = 0;
+        cloneListenerCalls = 0;
         const expectedNewValue = expectedNewValues[i];
         
         if (logPasses) console.log("\n--- Pass", (i + 1), "---");
@@ -104,7 +107,10 @@ function executeTest(
         const cloneCallTestPassed = (cloneCalls === expectedCloneCalls);
         if (logPasses) console.log(cloneCallTestPassed ? "CLONE CALL TEST PASSED" : "CLONE CALL TEST FAILED");
 
-        if (valueTestPassed && mutationTestPassed && thisRefTestPassed && cloneCallTestPassed) {
+        const cloneListenerCallTestPassed = (cloneListenerCalls === cloneCalls);
+        if (logPasses) console.log(cloneListenerCallTestPassed ? "CLONE LISTENER CALL TEST PASSED" : "CLONE LISTENER CALL TEST FAILED");
+
+        if (valueTestPassed && mutationTestPassed && thisRefTestPassed && cloneCallTestPassed && cloneListenerCallTestPassed) {
             passesSucceeded++;
         }
     }
