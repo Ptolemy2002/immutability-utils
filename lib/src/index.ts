@@ -75,3 +75,9 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
 
     return imRef;
 }
+
+export function immutableMut<T>(value: Cloneable<T>, cb: (v: Cloneable<T>) => void): Cloneable<T> {
+    const clone = value.clone();
+    cb(clone);
+    return clone;
+}

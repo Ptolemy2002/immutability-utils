@@ -11,12 +11,6 @@ A TypeScript library that wraps mutable classes and makes them immutable using p
 - **Toggle Support**: Can temporarily disable immutability when needed
 - **Clone Listeners**: Register callbacks that execute whenever a clone operation occurs
 
-## Installation
-
-```bash
-npm install @ptolemy2002/immutability-utils
-```
-
 ## Requirements
 
 Your class must implement a `clone()` method that returns a deep copy of the instance.
@@ -46,7 +40,7 @@ class Counter {
 }
 
 // Create an immutable reference
-const counterRef = immutable(new Counter(0));
+const counterRef = immutable<Counter>(new Counter(0));
 
 // This creates a new instance with value = 5
 counterRef.current.increment(5);
@@ -74,7 +68,7 @@ console.log(counterRef.current.value); // 8 (new instance)
 #### Temporarily Disable Immutability
 
 ```typescript
-const dataRef = immutable(new MyClass());
+const dataRef = immutable<MyClass>(new MyClass());
 
 // Disable immutability temporarily
 dataRef.enabled = false;
@@ -87,7 +81,7 @@ dataRef.enabled = true;
 You can register listeners that will be called whenever a clone operation occurs. This is useful for tracking changes, updating UI, or triggering side effects.
 
 ```typescript
-const counterRef = immutable(new Counter(0));
+const counterRef = immutable<Counter>(new Counter(0));
 
 // Add a listener that logs whenever a clone occurs
 counterRef.cloneListeners.push((imRef) => {
@@ -146,10 +140,20 @@ Creates an immutable reference wrapper around the provided object.
 
 **Example:**
 ```typescript
-const ref = immutable(new MyClass());
+const ref = immutable<MyClass>(new MyClass());
 ref.current.mutate(); // Creates a new instance
 console.log(ref.enabled); // true
 ```
+
+#### `immutableMut<T>(value: Cloneable<T>, cb: (v: Cloneable<T>) => void): Cloneable<T>`
+A utility function that allows you to perform mutations on a clone of the provided value within a callback, without fully wrapping it in an `ImmutableRef` and making every future mutation trigger cloning.
+
+**Parameters:**
+- `value`: An object that implements the `clone()` method
+- `cb`: A callback function that receives the cloned object for mutation
+
+**Returns:**
+- The mutated clone of the original object
 
 ## How Mutations Are Handled
 
