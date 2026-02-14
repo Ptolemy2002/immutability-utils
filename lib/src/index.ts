@@ -7,6 +7,22 @@ export type ImmutableRef<T=object> = {
     cloneListeners: Array<(imRef: ImmutableRef<T>) => void>
 };
 
+export function isGetter(target: unknown, prop: PropertyKey): boolean {
+    const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+
+    if (!!descriptor) {
+        return isCallable(descriptor.get);
+    } else if (target !== null) {
+        // go up the prototype chain
+        const proto = Object.getPrototypeOf(target);
+        if (proto) {
+            return isGetter(proto, prop);
+        }
+    }
+
+    return false;
+}
+
 export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
     const imRef: ImmutableRef<T> = { current: obj, enabled: true, cloneListeners: [] };
 
@@ -14,9 +30,32 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
     function applyProxy(target: Cloneable<T>): Cloneable<T> {
         return new Proxy(target, {
             get(o, prop, receiver) {
-                const value = Reflect.get(o, prop, receiver);
-                if (!imRef.enabled) return value;
+                if (!imRef.enabled) return Reflect.get(o, prop, receiver);
+                
+                const get = isGetter(o, prop);
+                if (get) {
+                    // The getter could mutate the object, so we need to clone it first
+                    const cloned = o.clone();
 
+                    // Disable for the duration of this call (it could be a getter that triggers more mutations).
+                    // All mutations in this call will be treated
+                    // as one mutation.
+                    imRef.enabled = false;
+                    const result = Reflect.get(cloned, prop, receiver);
+                    imRef.enabled = true;
+                    
+                    // Sync the reference to the new cloned object
+                    // and reapply the proxy
+                    imRef.current = applyProxy(cloned);
+
+                    for (const listener of imRef.cloneListeners) {
+                        listener(imRef);
+                    }
+
+                    return result;
+                }
+
+                const value = Reflect.get(o, prop, receiver);
                 const isFunction = isCallable(value);
                 if (isFunction && prop !== 'clone') {
                     // The function could mutate the object, so we need to clone it first

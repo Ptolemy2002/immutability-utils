@@ -69,6 +69,7 @@ function executeTest(
     initialValue: number = 10, expectedNewValues: number[] = [10],
     expectedMutated: boolean = true,
     passes: number = 3, expectedCloneCalls: number = 1,
+    expectedCloneListenerOffset: number = 0,
     logPasses: boolean = true
 ) {
     console.log(`\n--- ${name} ---`);
@@ -95,20 +96,20 @@ function executeTest(
         if (logPasses) console.log(`Current number: ${dataRef.current.number}`);
 
         const valueTestPassed = (dataRef.current.number === expectedNewValue);
-        if (logPasses) console.log(valueTestPassed ? "VALUE TEST PASSED" : "VALUE TEST FAILED");
+        if (logPasses) console.log(valueTestPassed ? "VALUE TEST PASSED" : `VALUE TEST FAILED: ${dataRef.current.number} !== ${expectedNewValue}`);
 
         const mutationTestPassed = (prevData !== dataRef.current) === expectedMutated;
         if (logPasses) console.log(mutationTestPassed ? "MUTATION TEST PASSED" : "MUTATION TEST FAILED");
 
-        // This test is for ensuring the reference to 'this' is correct inside methods
+        const cloneCallTestPassed = (cloneCalls === expectedCloneCalls);
+        if (logPasses) console.log(cloneCallTestPassed ? "CLONE CALL TEST PASSED" : `CLONE CALL TEST FAILED: ${cloneCalls} !== ${expectedCloneCalls}`);
+
+        const cloneListenerCallTestPassed = (cloneListenerCalls + expectedCloneListenerOffset === cloneCalls);
+        if (logPasses) console.log(cloneListenerCallTestPassed ? "CLONE LISTENER CALL TEST PASSED" : `CLONE LISTENER CALL TEST FAILED: ${cloneListenerCalls + expectedCloneListenerOffset} !== ${cloneCalls}`);
+
+        // This test is for ensuring the reference to 'this' is correct inside methods. It will cause another clone call.
         const thisRefTestPassed = (dataRef.current.number === dataRef.current.numberGetter);
         if (logPasses) console.log(thisRefTestPassed ? "THIS REF TEST PASSED" : "THIS REF TEST FAILED");
-
-        const cloneCallTestPassed = (cloneCalls === expectedCloneCalls);
-        if (logPasses) console.log(cloneCallTestPassed ? "CLONE CALL TEST PASSED" : "CLONE CALL TEST FAILED");
-
-        const cloneListenerCallTestPassed = (cloneListenerCalls === cloneCalls);
-        if (logPasses) console.log(cloneListenerCallTestPassed ? "CLONE LISTENER CALL TEST PASSED" : "CLONE LISTENER CALL TEST FAILED");
 
         if (valueTestPassed && mutationTestPassed && thisRefTestPassed && cloneCallTestPassed && cloneListenerCallTestPassed) {
             passesSucceeded++;
@@ -120,89 +121,91 @@ function executeTest(
 
 executeTest("Direct Mutation Test | Variable", (d) => {
     d.current.number = 20;
-}, 0, [20, 20, 20], true, 3, 1, false);
+}, 0, [20, 20, 20], true, 3, 1, 0, false);
 
 executeTest("Direct Mutation Test | Setter", (d) => {
     d.current.numberSetter = 30;
-}, 0, [30, 30, 30], true, 3, 1, false);
+}, 0, [30, 30, 30], true, 3, 1, 0, false);
 
 executeTest("Increment Call Test", (d) => {
     d.current.increment(5);
-}, 0, [5, 10, 15], true, 3, 1, false);
+}, 0, [5, 10, 15], true, 3, 1, 0, false);
 
 executeTest("Double Increment Call Test", (d) => {
     d.current.doubleIncrement(4);
-}, 0, [8, 16, 24], true, 3, 1, false);
+}, 0, [8, 16, 24], true, 3, 1, 0, false);
 
 executeTest("Decrement Call Test", (d) => {
     d.current.decrement(3);
-}, 0, [-3, -6, -9], true, 3, 1, false);
+}, 0, [-3, -6, -9], true, 3, 1, 0, false);
 
 executeTest("Double Decrement Call Test", (d) => {
     d.current.doubleDecrement(2);
-}, 0, [-4, -8, -12], true, 3, 1, false);
+}, 0, [-4, -8, -12], true, 3, 1, 0, false);
 
 executeTest("Chained Calls Test", (d) => {
     d.current.increment(10).decrement(4);
-}, 0, [6, 12, 18], true, 3, 1, false);
+}, 0, [6, 12, 18], true, 3, 1, 0, false);
 
 executeTest("Setting Same Value Test", (d) => {
     d.current.number = d.current.number;
-}, 0, [0, 0, 0], true, 3, 1, false);
+}, 0, [0, 0, 0], true, 3, 1, 0, false);
 executeTest("No Mutation Test | Variable", (d) => {
     d.current.number;
-}, 0, [0, 0, 0], false, 3, 0, false);
+}, 0, [0, 0, 0], false, 3, 0, 0, false);
 
+// Still expect a clone and mutation since the library assumes all getters could potentially cause mutations.
 executeTest("No Mutation Test | Getter", (d) => {
     d.current.numberGetter;
-}, 0, [0, 0, 0], false, 3, 0, false);
+}, 0, [0, 0, 0], true, 3, 1, 0, false);
 
-// Expect 1 clone call instead of 0, since the clone method will always be called when testFn is executed
+// Expect 1 clone calls instead of 0, since the clone method will always be called when testFn is executed
+// However, that will not trigger the clone listener, as the ref will be disabled at that time.
 executeTest("No Mutation Test | Clone Call", (d) => {
     d.current.clone();
-}, 0, [0, 0, 0], false, 3, 1, false);
+}, 0, [0, 0, 0], false, 3, 1, 1, false);
 
 executeTest("Method Returning Number Test", (d) => {
     const result = d.current.doubleValue();
-}, 5, [5, 5, 5], true, 3, 1, false);
+}, 5, [5, 5, 5], true, 3, 1, 0, false);
 
 executeTest("Method Returning Void Test", (d) => {
     d.current.reset();
-}, 10, [0, 0, 0], true, 3, 1, false);
+}, 10, [0, 0, 0], true, 3, 1, 0, false);
 
 executeTest("Sequential Mutations Test", (d) => {
     d.current.number = 5;
     d.current.number = 10;
     d.current.number = 15;
-}, 0, [15, 15, 15], true, 3, 3, false);
+}, 0, [15, 15, 15], true, 3, 3, 0, false);
 
 executeTest("Getter Then Setter Test", (d) => {
     const val = d.current.numberGetter;
     d.current.numberSetter = val + 10;
-}, 0, [10, 20, 30], true, 3, 1, false);
+}, 0, [10, 20, 30], true, 3, 2, 0, false);
 
 executeTest("Chained With Non-Data Return Test", (d) => {
     d.current.increment(5);
     d.current.doubleValue();
     d.current.increment(3);
-}, 0, [8, 16, 24], true, 3, 3, false);
+}, 0, [8, 16, 24], true, 3, 3, 0, false);
 
 executeTest("Property As Method Arg Test", (d) => {
     d.current.increment(d.current.number);
-}, 5, [10, 20, 40], true, 3, 1, false);
+}, 5, [10, 20, 40], true, 3, 1, 0, false);
 
 executeTest("Triple Chained Calls Test", (d) => {
     d.current.increment(2).increment(3).decrement(1);
-}, 0, [4, 8, 12], true, 3, 1, false);
+}, 0, [4, 8, 12], true, 3, 1, 0, false);
 
 executeTest("Different Initial Value Test", (d) => {
     d.current.increment(5);
-}, 100, [105, 110, 115], true, 3, 1, false);
+}, 100, [105, 110, 115], true, 3, 1, 0, false);
 
 executeTest("Conditional Setter No Change Test", (d) => {
     d.current.clampedSetter = -5;
-}, 0, [0, 0, 0], true, 3, 1, false);
+}, 0, [0, 0, 0], true, 3, 1, 0, false);
 
 executeTest("Method Calling Setter Test", (d) => {
     d.current.setViaProperty(42);
-}, 0, [42, 42, 42], true, 3, 1, false);
+}, 0, [42, 42, 42], true, 3, 1, 0, false);
