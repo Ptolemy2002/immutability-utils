@@ -21,6 +21,7 @@ export function satisfiesDepth(depth: CloneDepth, value: number): boolean {
 function _extClone<T>(source: T, remainingDepth: number, seen: WeakMap<object, unknown>): T {
     if (source === null || typeof source !== "object") return source;
     if (seen.has(source)) return seen.get(source) as T;
+    if (remainingDepth <= 0) return source;
 
     // Let lodash handle the shallow copy at this level
     const result = clone(source);
