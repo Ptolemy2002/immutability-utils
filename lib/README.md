@@ -1,184 +1,89 @@
 # Immutability Utils
-A TypeScript library that wraps mutable classes and makes them immutable using proxies and cloning. This library allows you to work with classes designed with a mutable API while automatically maintaining immutability through copy-on-write semantics.
+A TypeScript library that wraps mutable values and makes them immutable using proxies and cloning. This library allows you to work with classes designed with a mutable API while automatically maintaining immutability through copy-on-write semantics.
 
-## Features
+The library, for performance and simplicity purposes, assumes that any object with a callable `clone` method is one where that method takes exactly one optional parameter (the clone depth), returns the same type as the object itself, and does not perform any mutations on the original object. If these assumptions are not met, the library may not work correctly.
 
-- **Automatic Copy-on-Write**: Any mutation (property assignment or method call) automatically creates a clone of the object
-- **Proxy-Based**: Uses JavaScript Proxies to intercept and handle mutations transparently
-- **Zero Refactoring**: Works with existing mutable classes without requiring changes to the class implementation
-- **Type-Safe**: Full TypeScript support with proper type inference
-- **Efficient**: Groups multiple mutations within a single method call into one clone operation
-- **Toggle Support**: Can temporarily disable immutability when needed
-- **Clone Listeners**: Register callbacks that execute whenever a clone operation occurs
-
-## Requirements
-
-Your class must implement a `clone()` method that returns a deep copy of the instance.
-
-## Usage
-
-### Basic Example
-
+## Type Reference
 ```typescript
-import { immutable, ImmutableRef } from '@ptolemy2002/immutability-utils';
-
-class Counter {
-    value: number;
-
-    constructor(value: number) {
-        this.value = value;
-    }
-
-    increment(amount: number): Counter {
-        this.value += amount;
-        return this;
-    }
-
-    clone(): Counter {
-        return new Counter(this.value);
-    }
-}
-
-// Create an immutable reference
-const counterRef = immutable<Counter>(new Counter(0));
-
-// This creates a new instance with value = 5
-counterRef.current.increment(5);
-console.log(counterRef.current.value); // 5
-
-// The old instance is preserved
-const oldCounter = counterRef.current;
-counterRef.current.increment(3);
-console.log(oldCounter.value); // 5 (unchanged)
-console.log(counterRef.current.value); // 8 (new instance)
-```
-
-### How It Works
-
-1. **Method Calls**: When you call a method that might mutate the object, the library first clones the object, then calls the method on the clone, and finally updates the reference to point to the new clone.
-
-2. **Property Assignments**: When you set a property, the library clones the object first, applies the change to the clone, and updates the reference.
-
-3. **Read Operations**: Getters and property reads do not trigger cloning.
-
-4. **Chained Calls**: Multiple mutations within a single method call are treated as one mutation (only one clone is created).
-
-### Advanced Features
-
-#### Temporarily Disable Immutability
-
-```typescript
-const dataRef = immutable<MyClass>(new MyClass());
-
-// Disable immutability temporarily
-dataRef.enabled = false;
-dataRef.current.someProperty = "mutated in place"; // No clone created
-dataRef.enabled = true;
-```
-
-#### Clone Listeners
-
-You can register listeners that will be called whenever a clone operation occurs. This is useful for tracking changes, updating UI, or triggering side effects.
-
-```typescript
-const counterRef = immutable<Counter>(new Counter(0));
-
-// Add a listener that logs whenever a clone occurs
-counterRef.cloneListeners.push((imRef) => {
-    console.log('Clone occurred! New value:', imRef.current.value);
-});
-
-// This will trigger the listener
-counterRef.current.increment(5); // Logs: "Clone occurred! New value: 5"
-counterRef.current.increment(3); // Logs: "Clone occurred! New value: 8"
-```
-
-**Use Cases for Clone Listeners:**
-- Triggering React state updates when working with immutable data structures
-- Logging or debugging mutation operations
-- Synchronizing changes to external systems
-- Implementing undo/redo functionality
-
-## API Reference
-
-### Types
-
-#### `Cloneable<T>`
-
-A type representing an object that can be cloned. It's essentially `T` with a `clone()` method that returns `Cloneable<T>`.
-
-```typescript
-type Cloneable<T=object> = Override<T, { clone(): Cloneable<T> }>;
-```
-
-#### `ImmutableRef<T>`
-
-A reference object containing the current immutable instance and an enabled flag.
-
-```typescript
-type ImmutableRef<T=object> = {
-    current: Cloneable<T>,                          // The current instance
-    enabled: boolean,                                // Whether immutability is enabled
-    cloneListeners: Array<(imRef: ImmutableRef<T>) => void>  // Callbacks invoked on clone
+type CloneDepth = number | "max";
+type WithCustomClone<T> = { clone(depth?: CloneDepth): T };
+type ImmutableRef<T> = {
+    readonly current: T, enabled: boolean, depth: CloneDepth, respectCustom: boolean,
+    nonMutatingKeys: PropertyKey[],
+    cloneListeners: Array<(imRef: ImmutableRef<T>) => void>
 };
 ```
 
-### Functions
+## Functions
+The following functions are exported by the library:
 
-#### `immutable<T>(obj: Cloneable<T>): ImmutableRef<T>`
-
-Creates an immutable reference wrapper around the provided object.
-
-**Parameters:**
-- `obj`: An object that implements the `clone()` method
-
-**Returns:**
-- An `ImmutableRef<T>` object containing:
-  - `current`: The proxied instance (initially the object you passed in)
-  - `enabled`: A boolean flag (initially `true`) that controls whether immutability is active
-  - `cloneListeners`: An empty array (initially `[]`) where you can register listener callbacks
-
-**Example:**
+### satisfiesDepth
 ```typescript
-const ref = immutable<MyClass>(new MyClass());
-ref.current.mutate(); // Creates a new instance
-console.log(ref.enabled); // true
+function satisfiesDepth(depth: CloneDepth, value: number): boolean
 ```
+A simple function that checks if a given value satisfies the specified clone depth. If the depth is less than `0`, it will be clamped to `0`. If the depth is `"max"`, the function will always return `true`. Otherwise, it checks if the value is less than or equal to the depth.
 
-#### `immutableMut<T>(value: Cloneable<T>, cb: (v: Cloneable<T>) => void): Cloneable<T>`
-A utility function that allows you to perform mutations on a clone of the provided value within a callback, without fully wrapping it in an `ImmutableRef` and making every future mutation trigger cloning.
+### extClone<T>
+```typescript
+function extClone<T>(value: T, depth: CloneDepth = "max", respectCustom = true): T
+```
+Extends the two `lodash` cloning functions by adding support for custom clone methods and clone depth. If the value has a callable `clone` method and `respectCustom` is `true`, it will use that method to clone the value. Otherwise, it will use `lodash.clone` directly if the depth is `0`, `lodash.clonedeep` if the depth is `"max"`, or repeated `lodash.clone` calls if the depth is a positive number.
 
-**Parameters:**
-- `value`: An object that implements the `clone()` method
-- `cb`: A callback function that receives the cloned object for mutation
+#### Parameters
+- `value` (`T`): The value to clone.
+- `depth` (`CloneDepth`, optional): The depth to clone. Defaults to `"max"`.
+- `respectCustom` (`boolean`, optional): Whether to respect custom clone methods. Defaults to `true`.
 
-**Returns:**
-- The mutated clone of the original object
+### isGetter
+```typescript
+function isGetter(target: unknown, prop: PropertyKey): boolean
+```
+Checks if the given property is a getter on the target object. Used internally to determine if a property access could potentially mutate the object.
 
-## How Mutations Are Handled
+#### Parameters
+- `target` (`unknown`): The object to check for the getter property.
+- `prop` (`PropertyKey`): The property key to check.
 
-1. **Property Setters**: When you set a property (e.g., `obj.prop = value`), the library:
-   - Clones the object
-   - Temporarily disables immutability during the setter execution
-   - Sets the property on the clone
-   - Re-enables immutability
-   - Updates `current` to point to the new clone
-   - Invokes all registered clone listeners
+### immutableMut<T>
+```typescript
+function immutableMut<T>(value: T, cb: (v: T) => void, respectCustom = true): T
+```
+A utility function that allows you to perform mutations on a value while maintaining immutability. It clones the value, passes the clone to the provided callback for mutation, and then returns the mutated clone.
 
-2. **Method Calls**: When you call a method (except `clone()`), the library:
-   - Clones the object
-   - Temporarily disables immutability during method execution
-   - Calls the method on the clone
-   - Re-enables immutability
-   - Updates `current` to point to the new clone
-   - Invokes all registered clone listeners
-   - Returns the method's result
+#### Parameters
+- `value` (`T`): The value to clone and mutate.
+- `cb` (`(v: T) => void`): A callback function that receives the cloned value for mutation.
+- `respectCustom` (`boolean`, optional): Whether to respect custom clone methods. Defaults to `true`.
 
-3. **Read Operations**: Property reads and getters do not trigger cloning and return the value directly.
+### immutable<T extends object>
+```typescript
+function immutable<T extends object>(
+    obj: T, depth: CloneDepth = "max",
+    nonMutatingKeys: PropertyKey[] = [],
+    respectCustom=true
+): ImmutableRef<T>
+```
+Wraps the given object in a proxy that enforces immutability by cloning the object whenever a mutation is expected. That is:
+- Whenever a property is set, if the reference is enabled, the object will be cloned, the property will be set on the clone, and `ref.current` will be updated to the clone.
+- Whenever a property is accessed, if the reference is enabled, the property is not in the `nonMutatingKeys` list (or is not `clone`), and the property is a getter, the object will be cloned and `ref.current` will be updated to the clone.
+- Whenever a property is accessed, if the reference is enabled, the property is not in the `nonMutatingKeys` list (or is not `clone`), and the property value is a function, the function will be wrapped in another function that clones the object and updates `ref.current` to the clone before making the call with the same arguments.
 
-4. **The `clone()` Method**: Calling `clone()` explicitly does not trigger the immutability mechanism and returns a clone directly.
+Note that the reference will be disabled during the execution of any getter, setter, or function call, so the reference to `this` remains correct for the duration of that operation and any mutations that occur during that operation will be batched.
+
+After any operation is done, all listeners in `ref.cloneListeners` will be called with the reference as an argument, so you can subscribe to changes by adding a listener to that array.
+
+#### Parameters
+- `obj` (`T`): The initial object to wrap in the immutable proxy.
+- `depth` (`CloneDepth`, optional): The initial clone depth to use for the reference. Defaults to `"max"`.
+- `respectCustom` (`boolean`, optional): The initial value for whether to respect custom clone methods. Defaults to `true`.
+- `nonMutatingKeys` (`PropertyKey[]`, optional): An initial array of property keys that should be considered non-mutating, meaning that accessing them will not trigger cloning. Defaults to an empty array. Note that the `clone` property is always considered non-mutating regardless of whether it is included in this array or not.
+
+All of these parameters (except for `obj`) are also mutable properties of the returned reference, so you can change them at any time after the fact.
 
 ## Peer Dependencies
+- `is-callable`: `^1.2.7`
+- `lodash.clone`: `^4.5.0`
+- `lodash.clonedeep`: `^4.5.0`
 
 ## Commands
 The following commands exist in the project:

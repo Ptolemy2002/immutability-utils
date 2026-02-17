@@ -30,13 +30,16 @@
         "release-major": "bash ./scripts/release.sh major"
     },
     "devDependencies": {
+        "@types/is-callable": "^1.1.2",
+        "@types/lodash.clone": "^4.5.9",
+        "@types/lodash.clonedeep": "^4.5.9",
         "ts-patch": "^3.3.0",
         "tsconfig-paths": "^4.2.0",
         "typescript-transform-paths": "^3.5.3"
     },
-    "dependencies": {
-        "@ptolemy2002/ts-utils": "^3.2.1",
-        "@types/is-callable": "^1.1.2",
-        "is-callable": "^1.2.7"
+    "peerDependencies": {
+        "is-callable": "^1.2.7",
+        "lodash.clone": "^4.5.0",
+        "lodash.clonedeep": "^4.5.0"
     }
 }

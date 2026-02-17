@@ -1,9 +1,11 @@
 import isCallable from 'is-callable';
-import { Override } from '@ptolemy2002/ts-utils';
+import { extClone, CloneDepth, WithCustomClone } from './extClone';
 
-export type Cloneable<T=object> = Override<T, { clone(): Cloneable<T> }>;
-export type ImmutableRef<T=object> = {
-    current: Cloneable<T>, enabled: boolean,
+export * from './extClone';
+
+export type ImmutableRef<T> = {
+    readonly current: T, enabled: boolean, depth: CloneDepth, respectCustom: boolean,
+    nonMutatingKeys: PropertyKey[],
     cloneListeners: Array<(imRef: ImmutableRef<T>) => void>
 };
 
@@ -23,30 +25,53 @@ export function isGetter(target: unknown, prop: PropertyKey): boolean {
     return false;
 }
 
-export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
-    const imRef: ImmutableRef<T> = { current: obj, enabled: true, cloneListeners: [] };
+// A hack so that we don't have to use ts-ignore all over the place.
+// The property should be readonly to the outside world, but we need
+// to be able to update it internally.
+function setCurrent<T>(imRef: ImmutableRef<T>, value: T) {
+    // @ts-ignore
+    imRef.current = value;
+}
+
+export function immutable<T extends object>(
+    obj: T, depth: CloneDepth = "max",
+    nonMutatingKeys: PropertyKey[] = [],
+    respectCustom=true
+): ImmutableRef<T> {
+    const imRef: ImmutableRef<T> = { current: obj, enabled: true, cloneListeners: [], depth, respectCustom, nonMutatingKeys };
 
     // Wrap in a Proxy to override mutations
-    function applyProxy(target: Cloneable<T>): Cloneable<T> {
+    function applyProxy(target: T): T {
         return new Proxy(target, {
             get(o, prop, receiver) {
                 if (!imRef.enabled) return Reflect.get(o, prop, receiver);
+                const isNonMutating = imRef.nonMutatingKeys.includes(prop);
+                
+                // We have been told this is a non-mutating key, so we can
+                // skip the cloning and just return the value directly.
+                if (isNonMutating || prop === 'clone') {
+                    return Reflect.get(o, prop, receiver);
+                }
                 
                 const get = isGetter(o, prop);
                 if (get) {
                     // The getter could mutate the object, so we need to clone it first
-                    const cloned = o.clone();
+                    const cloned = extClone(o, imRef.depth, imRef.respectCustom);
 
                     // Disable for the duration of this call (it could be a getter that triggers more mutations).
                     // All mutations in this call will be treated
                     // as one mutation.
-                    imRef.enabled = false;
-                    const result = Reflect.get(cloned, prop, receiver);
-                    imRef.enabled = true;
+                    let result;
+                    try {
+                        imRef.enabled = false;
+                        result = Reflect.get(cloned, prop, receiver);
+                    } finally {
+                        imRef.enabled = true;
+                    }
                     
                     // Sync the reference to the new cloned object
                     // and reapply the proxy
-                    imRef.current = applyProxy(cloned);
+                    setCurrent(imRef, applyProxy(cloned));
 
                     for (const listener of imRef.cloneListeners) {
                         listener(imRef);
@@ -57,21 +82,25 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
 
                 const value = Reflect.get(o, prop, receiver);
                 const isFunction = isCallable(value);
-                if (isFunction && prop !== 'clone') {
+                if (isFunction) {
                     // The function could mutate the object, so we need to clone it first
                     return function (...args: any[]) {
-                        const cloned = o.clone();
+                        const cloned = extClone(o, imRef.depth, imRef.respectCustom);
 
                         // Disable for the duration of this call.
                         // All mutations in this call will be treated
                         // as one mutation.
-                        imRef.enabled = false;
-                        const result = cloned[prop](...args);
-                        imRef.enabled = true;
+                        let result;
+                        try {
+                            imRef.enabled = false;
+                            result = cloned[prop](...args);
+                        } finally {
+                            imRef.enabled = true;
+                        }
 
                         // Sync the reference to the new cloned object
                         // and reapply the proxy
-                        imRef.current = applyProxy(cloned);
+                        setCurrent(imRef, applyProxy(cloned));
 
                         for (const listener of imRef.cloneListeners) {
                             listener(imRef);
@@ -88,18 +117,22 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
                 if (!imRef.enabled) return Reflect.set(o, prop, value, receiver);
 
                 // On any mutation, clone the object first.
-                const cloned = o.clone();
+                const cloned = extClone(o, imRef.depth, imRef.respectCustom);
 
                 // Disable for the duration of this call (it could be a setter that triggers more mutations).
                 // All mutations in this call will be treated
                 // as one mutation.
-                imRef.enabled = false;
-                const result = Reflect.set(cloned, prop, value, cloned);
-                imRef.enabled = true;
+                let result;
+                try {
+                    imRef.enabled = false;
+                    result = Reflect.set(cloned, prop, value, cloned);
+                } finally {
+                    imRef.enabled = true;
+                }
 
                 // Sync the reference to the new cloned object
                 // and reapply the proxy
-                imRef.current = applyProxy(cloned);
+                setCurrent(imRef, applyProxy(cloned));
 
                 for (const listener of imRef.cloneListeners) {
                     listener(imRef);
@@ -110,13 +143,13 @@ export function immutable<T>(obj: Cloneable<T>): ImmutableRef<T> {
         });
     }
 
-    imRef.current = applyProxy(imRef.current);
+    setCurrent(imRef, applyProxy(imRef.current));
 
     return imRef;
 }
 
-export function immutableMut<T>(value: Cloneable<T>, cb: (v: Cloneable<T>) => void): Cloneable<T> {
-    const clone = value.clone();
+export function immutableMut<T>(value: T, cb: (v: T) => void, respectCustom = true): T {
+    const clone = extClone(value, "max", respectCustom);
     cb(clone);
     return clone;
 }
