@@ -71,7 +71,7 @@ export function extClone<T>(obj: T, depth: CloneDepth, respectCustom=true): T {
     } else if (depth === "max") {
         return cloneDeep(obj);
     } else if (depth === 0) {
-        return clone(obj);
+        return obj; // No cloning at depth 0, return the same instance.
     } else {
         return _extClone(obj, depth, new WeakMap());
     }
