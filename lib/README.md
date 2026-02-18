@@ -23,6 +23,30 @@ function satisfiesDepth(depth: CloneDepth, value: number): boolean
 ```
 A simple function that checks if a given value satisfies the specified clone depth. If the depth is less than `0`, it will be clamped to `0`. If the depth is `"max"`, the function will always return `true`. Otherwise, it checks if the value is less than or equal to the depth.
 
+#### Parameters
+- `depth` (`CloneDepth`): The clone depth to check against.
+- `value` (`number`): The value to check against the clone depth.
+
+### depthIncrement
+```typescript
+function depthIncrement(depth: CloneDepth, value: number = 1): CloneDepth
+```
+Increments the given clone depth by the specified value. If the depth is `"max"`, it will remain `"max"`. If the resulting depth is less than `0`, it will be clamped to `0`.
+
+#### Parameters
+- `depth` (`CloneDepth`): The current clone depth.
+- `value` (`number`, optional): The value to increment the depth by. Defaults to `1`.
+
+### depthDecrement
+```typescript
+function depthDecrement(depth: CloneDepth, value: number = 1): CloneDepth
+```
+Decrements the given clone depth by the specified value. If the depth is `"max"`, it will remain `"max"`. If the resulting depth is less than `0`, it will be clamped to `0`.
+
+#### Parameters
+- `depth` (`CloneDepth`): The current clone depth.
+- `value` (`number`, optional): The value to decrement the depth by. Defaults to `1`.
+
 ### extClone<T>
 ```typescript
 function extClone<T>(value: T, depth: CloneDepth = "max", respectCustom = true): T

@@ -18,6 +18,16 @@ export function satisfiesDepth(depth: CloneDepth, value: number): boolean {
     return value <= depth;
 }
 
+export function depthIncrement(depth: CloneDepth, value: number = 1): CloneDepth {
+    if (depth === "max") return "max";
+    return Math.max(0, depth + value);
+}
+
+export function depthDecrement(depth: CloneDepth, value: number = 1): CloneDepth {
+    if (depth === "max") return "max";
+    return Math.max(0, depth - value);
+}
+
 function _extClone<T>(source: T, remainingDepth: number, seen: WeakMap<object, unknown>): T {
     if (source === null || typeof source !== "object") return source;
     if (seen.has(source)) return seen.get(source) as T;
