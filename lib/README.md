@@ -105,9 +105,7 @@ After any operation is done, all listeners in `ref.cloneListeners` will be calle
 All of these parameters (except for `obj`) are also mutable properties of the returned reference, so you can change them at any time after the fact.
 
 ## Peer Dependencies
-- `is-callable`: `^1.2.7`
-- `lodash.clone`: `^4.5.0`
-- `lodash.clonedeep`: `^4.5.0`
+This project does not have any peer dependencies, so it should work out of the box.
 
 ## Commands
 The following commands exist in the project:
