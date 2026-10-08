@@ -13,11 +13,10 @@
         "directory": "lib"
     },
     "scripts": {
-        "prepare": "npx ts-patch install -s",
+        "prepare": "npx ts-patch install -s && npx typesync",
         "build": "bash ./scripts/build.sh",
         "_build": "tsc --project ./tsconfig.json",
         "typecheck": "tsc --noEmit",
-        "postinstall": "npx typesync",
         "uninstall": "bash ./scripts/uninstall.sh",
         "reinstall": "bash ./scripts/reinstall.sh",
         "example-uninstall": "bash ./scripts/example-uninstall.sh",
